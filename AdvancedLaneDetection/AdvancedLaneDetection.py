@@ -17,12 +17,13 @@ def absoluteSobelFilter(img,dir,thresh,kernel_size):
     # 4) Scale to 8-bit (0 - 255) then convert to type = np.uint8
     scaled_sobel = np.uint8(255*abs_sobel/np.max(abs_sobel))
     # 5) Create a mask of 1's where the scaled gradient magnitude 
-    ret,binary_output = cv2.threshold(scaled_sobel,thresh[0],thresh[1],cv2.THRESH_BINARY)
+    sobel_binary = np.zeros_like(scaled_sobel)
+    sobel_binary[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
     # 6) Return this mask as your binary_output image
     plt.title("Sobel x")
-    plt.imshow(binary_output,cmap='gray')
+    plt.imshow(sobel_binary,cmap='gray')
     plt.show()
-    return binary_output
+    return sobel_binary
 
 def colorFilter(img,thresh):
     hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
@@ -30,8 +31,9 @@ def colorFilter(img,thresh):
     l_channel = hls[:,:,1]
     s_channel = hls[:,:,2]
 
-    #s_binary = cv2.threshold(s_channel,thresh[0],thresh[1],cv2.THRESH_BINARY) # gives error when ploting
-    s_binary = (s_channel>=thresh[0]) & (s_channel <= thresh[1])
+    s_binary = np.zeros_like(s_channel)
+    s_binary[(s_channel>=thresh[0]) & (s_channel<=thresh[1])] = 1
+
     plt.title("Filtered s")
     plt.imshow(s_binary,cmap='gray')
     plt.show()
@@ -44,18 +46,20 @@ def detectLines(img):
     sobel_binary = absoluteSobelFilter(img,'x',thresh_sobel,sobel_kernel_size)
     color_binary = colorFilter(img,thresh_color)
 
-    output_binary = sobel_binary | color_binary
-    color_binary = np.dstack(( np.zeros_like(sobel_binary), sobel_binary, color_binary)) * 255
+    stacked_binary = np.dstack(( np.zeros_like(sobel_binary), sobel_binary, color_binary)) * 255
+
+    combined_binary = np.zeros_like(sobel_binary)
+    combined_binary[(color_binary == 1) | (sobel_binary == 1)] = 1
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
-    ax1.imshow(color_binary,cmap='gray')
+    ax1.imshow(stacked_binary,cmap='gray')
     ax1.set_title('Overlay Image', fontsize=30)
-    ax2.imshow(output_binary,cmap='gray')
+    ax2.imshow(combined_binary,cmap='gray')
     ax2.set_title('Combined Image', fontsize=30)
     plt.show()
 
 
-    return output_binary
+    return combined_binary
     
     
 
