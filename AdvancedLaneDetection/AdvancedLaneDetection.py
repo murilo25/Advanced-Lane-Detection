@@ -211,7 +211,16 @@ def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
     # Fit a second order polynomial to each using `np.polyfit`
     left_fit = np.polyfit(left_y, left_x, 2)
     right_fit = np.polyfit(right_y, right_x, 2)
-        # Generate x and y values for plotting
+    return left_fit,right_fit
+
+def computeLines(img):
+    left_x,left_y,right_x,right_y,img_out = findPixels(img)
+    left_fit,right_fit = fitPolynomialLines(left_x,left_y,right_x,right_y,img_out)
+
+    return left_fit,right_fit,img_out
+
+def drawLines(left_fit,right_fit,img_out):
+    # Generate x and y values for plotting
     ploty = np.linspace(0, img_out.shape[0]-1, img_out.shape[0] )
     try:
         left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
@@ -226,14 +235,10 @@ def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
     plt.plot(left_fitx, ploty, color='yellow')
     plt.plot(right_fitx, ploty, color='yellow')
     plt.show()
+    return
 
-    return 0
-
-def drawLines(img):
-    left_x,left_y,right_x,right_y,img_out = findPixels(img)
-    fitPolynomialLines(left_x,left_y,right_x,right_y,img_out)
-
-    return 0
+def computeCurvature():
+    return
 
 # set grid size internal to the chess board
 nCol = 9
@@ -306,5 +311,7 @@ image = cv2.imread('test_images/straight_lines2.jpg')
 undistorted_image = cv2.undistort(image, mtx, dist, None, mtx)
 birdsEye = changePerspective(undistorted_image) # apply region of interest mask and change perspective
 binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
-lines_parameters = drawLines(binary_birdsEye)
+left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
+drawLines(left_line_params,right_line_params,img_lines)
+computeCurvate()
 
