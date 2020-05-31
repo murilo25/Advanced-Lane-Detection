@@ -115,9 +115,10 @@ def findPixels(img):
     for i in range (0,img_size[0]):
         histogram.append(np.sum(img[:,i]))
     #hist2=np.sum(img,axis = 0) # same as for loop above
-    plt.title("Histogram on x-axis")
-    plt.plot(histogram)
-    plt.show()
+    ## display histogram
+    #plt.title("Histogram on x-axis")
+    #plt.plot(histogram)
+    #plt.show()
 
     # estimates x coordinate of lines
     left_window_center = np.argmax(histogram[:img_size[0]//2])
@@ -202,12 +203,35 @@ def findPixels(img):
     img_out[left_y, left_x] = [255, 0, 0]
     img_out[right_y, right_x] = [0, 0, 255]
     plt.imshow(img_out)
-    plt.show()
+    #plt.show()
 
     return left_x,left_y,right_x,right_y,img_out
 
+def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
+    # Fit a second order polynomial to each using `np.polyfit`
+    left_fit = np.polyfit(left_y, left_x, 2)
+    right_fit = np.polyfit(right_y, right_x, 2)
+        # Generate x and y values for plotting
+    ploty = np.linspace(0, img_out.shape[0]-1, img_out.shape[0] )
+    try:
+        left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+        right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    except TypeError:
+        # Avoids an error if `left` and `right_fit` are still none or incorrect
+        print('The function failed to fit a line!')
+        left_fitx = 1*ploty**2 + 1*ploty
+        right_fitx = 1*ploty**2 + 1*ploty
+
+    # Plots the left and right polynomials on the lane lines
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    plt.show()
+
+    return 0
+
 def drawLines(img):
     left_x,left_y,right_x,right_y,img_out = findPixels(img)
+    fitPolynomialLines(left_x,left_y,right_x,right_y,img_out)
 
     return 0
 
@@ -273,12 +297,12 @@ dst = cv2.undistort(img, mtx, dist, None, mtx)
 ### lane detection ###
 image = cv2.imread('test_images/straight_lines1.jpg')
 image = cv2.imread('test_images/straight_lines2.jpg')
-image = cv2.imread('test_images/test1.jpg')
-image = cv2.imread('test_images/test2.jpg')
-image = cv2.imread('test_images/test3.jpg')
-image = cv2.imread('test_images/test4.jpg') # good but can improve
-image = cv2.imread('test_images/test5.jpg') # bad
-image = cv2.imread('test_images/test6.jpg')
+#image = cv2.imread('test_images/test1.jpg')
+#image = cv2.imread('test_images/test2.jpg')
+#image = cv2.imread('test_images/test3.jpg')
+#image = cv2.imread('test_images/test4.jpg')
+#image = cv2.imread('test_images/test5.jpg') # bad
+#image = cv2.imread('test_images/test6.jpg')
 undistorted_image = cv2.undistort(image, mtx, dist, None, mtx)
 birdsEye = changePerspective(undistorted_image) # apply region of interest mask and change perspective
 binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
