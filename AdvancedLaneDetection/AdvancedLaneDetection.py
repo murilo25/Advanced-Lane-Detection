@@ -70,13 +70,14 @@ def detectLane(img):
     combined_binary = np.zeros_like(sobel_binary)
     combined_binary[(color_binary == 1) | (sobel_binary == 1)] = 1
 
-    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
-    ax1.imshow(stacked_binary,cmap='gray')
-    ax1.set_title('Overlay detection', fontsize=30)
-    ax2.imshow(combined_binary,cmap='gray')
-    ax2.set_title('Combined detection', fontsize=30)
-    plt.show()
-    #combined_binary = cv2.blur(combined_binary,(21,21))
+    
+    #f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
+    #ax1.imshow(stacked_binary,cmap='gray')
+    #ax1.set_title('Overlay detection', fontsize=30)
+    #ax2.imshow(combined_binary,cmap='gray')
+    #ax2.set_title('Combined detection', fontsize=30)
+    #plt.show()
+
     return combined_binary
     
 def changePerspective(img):
@@ -98,9 +99,9 @@ def changePerspective(img):
     # use transform to change perspective to top view
     birdsEye = cv2.warpPerspective(img,M,img_size,flags=cv2.INTER_LINEAR)
 
-    plt.title('Birds eye')
-    plt.imshow(birdsEye,cmap='gray')
-    plt.show()
+    #plt.title('Birds eye')
+    #plt.imshow(birdsEye,cmap='gray')
+    #plt.show()
 
     return birdsEye
 
@@ -202,7 +203,7 @@ def findPixels(img):
     # Colors pixels detected within windows
     img_out[left_y, left_x] = [255, 0, 0]
     img_out[right_y, right_x] = [0, 0, 255]
-    plt.imshow(img_out)
+    #plt.imshow(img_out)
     #plt.show()
 
     return left_x,left_y,right_x,right_y,img_out
@@ -232,9 +233,9 @@ def drawLines(left_fit,right_fit,img_out):
         right_fitx = 1*ploty**2 + 1*ploty
 
     # Plots the left and right polynomials on the lane lines
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.show()
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
+    #plt.show()
     return left_fitx,right_fitx
 
 def computeCurvateRadius(left_poly,right_poly,img_out):
@@ -282,8 +283,8 @@ def highlightLane(left_line_params,right_line_params,img):
     #new_img = cv2.imread('test_images/test3.jpg')
     img[region] = [0,255,0]
 
-    plt.imshow(img)
-    plt.show()
+    #plt.imshow(img)
+    #plt.show()
     return img
 
 def changePerspectiveBack(img,original):
@@ -403,15 +404,38 @@ image = cv2.imread('test_images/straight_lines1.jpg')
 #image = cv2.imread('test_images/test4.jpg')
 #image = cv2.imread('test_images/test5.jpg') # bad
 #image = cv2.imread('test_images/test6.jpg')
-undistorted_image = cv2.undistort(image, mtx, dist, None, mtx)
-birdsEye = changePerspective(undistorted_image) # change perspective
-binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
-left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
-drawLines(left_line_params,right_line_params,img_lines)
-radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
-highligthed_img = highlightLane(left_line_params,right_line_params,birdsEye)
-highlighted_img = changePerspectiveBack(highligthed_img,image)
-final_image = addText2Img(highlighted_img,radius)
 
-plt.imshow(cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB))
-plt.show()
+# load video
+cap = cv2.VideoCapture('project_video.mp4')
+fps = cap.get(5)
+frame_width = cap.get(3)
+frame_height = cap.get(4)
+# Define the codec and create VideoWriter object
+fourcc = cv2.VideoWriter_fourcc('X', 'V', 'I', 'D')
+out = cv2.VideoWriter('myVideo.avi',fourcc, fps, (int(frame_width),int(frame_height)))
+
+while(cap.isOpened()):
+    ret, frame = cap.read()
+    if ret==True:
+        undistorted_image = cv2.undistort(frame, mtx, dist, None, mtx)
+        birdsEye = changePerspective(undistorted_image) # change perspective
+        binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
+        left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
+        drawLines(left_line_params,right_line_params,img_lines)
+        radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
+        highligthed_img = highlightLane(left_line_params,right_line_params,birdsEye)
+        highlighted_img = changePerspectiveBack(highligthed_img,frame)
+        final_image = addText2Img(highlighted_img,radius)
+
+        final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
+        #plt.imshow(final_image)
+        #plt.show()
+        out.write(final_image)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    else:
+        break
+cap.release()
+out.release()
+cv2.destroyAllWindows()
