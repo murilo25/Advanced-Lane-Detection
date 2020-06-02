@@ -235,51 +235,146 @@ def drawLines(left_fit,right_fit,img_out):
     plt.plot(left_fitx, ploty, color='yellow')
     plt.plot(right_fitx, ploty, color='yellow')
     plt.show()
-    return
+    return left_fitx,right_fitx
 
-def computeCurvature():
-    return
+def computeCurvateRadius(left_poly,right_poly,img_out):
 
-# set grid size internal to the chess board
-nCol = 9
-nRow = 6
-# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-objp = np.zeros((nRow*nCol,3), np.float32)
-objp[:,:2] = np.mgrid[0:nCol, 0:nRow].T.reshape(-1,2)
+    print(left_poly)
+    print(right_poly)
+    # Define conversions in x and y from pixels space to meters
+    ym_per_pix = 30/676 # meters per pixel in y dimension (estimated length by looking at image/delta Y defined by the region of interest vertices)
+    xm_per_pix = 3.7/812 # meters per pixel in x dimension (lane width in meters / delta X in pixels defined by the region of interest
+   
+    # rescale polynomial coefficients to convert from pixels to meters
+    A_left = xm_per_pix/(ym_per_pix**2) * left_poly[0]
+    B_left = xm_per_pix/ym_per_pix * left_poly[1]
+    C_left = left_poly[2]
+    A_right = xm_per_pix/(ym_per_pix**2) * right_poly[0]
+    B_right = xm_per_pix/ym_per_pix * right_poly[1]
+    C_right = right_poly[2]
 
-# Arrays to store object points and image points from all the images.
-objpoints = [] # 3d points in real world space
-imgpoints = [] # 2d points in image plane.
+    y = np.linspace(0, img_out.shape[0]-1, img_out.shape[0] )
+    left = []
+    right = []
+    #for i in range(len(y)):
+    #    left.append( ( ( 1+(2*A_left*y[i]+B_left)**2 )**(3/2) ) / ( abs(2*A_left) ) )
+    #    right.append( ( ( 1+(2*A_right*y[i]+B_right)**2 )**(3/2) ) / ( abs(2*A_right) ) )
+    #r_left = np.mean(left)
+    #r_right = np.mean(right)
+    y = np.max(y)*ym_per_pix
+    r_left = ( ( 1+(2*A_left*y+B_left)**2 )**(3/2) ) / ( abs(2*A_left) ) 
+    r_right = ( ( 1+(2*A_right*y+B_right)**2 )**(3/2) ) / ( abs(2*A_right) ) 
+    
+    print(r_left)
+    print(r_right)
+    return (r_left+r_right)/2
 
-# Make a list of calibration images
-images = glob.glob('camera_cal/calibration*.jpg')
+def highlightLane(left_line_params,right_line_params,img):
+    # Find the region inside lane lines
+    XX, YY = np.meshgrid(np.arange(0, img.shape[1]), np.arange(0, img.shape[0]))
 
-print("Calibrating...\n")
+    left_line = left_line_params[0]*YY**2 + left_line_params[1]*YY + left_line_params[2]
+    right_line = right_line_params[0]*YY**2 + right_line_params[1]*YY + right_line_params[2]
+ 
+    region = ( (XX > left_line) & (XX <right_line) )
 
-# Step through the list and search for chessboard corners
-for idx, fname in enumerate(images):
-    img = cv2.imread(fname)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #new_img = np.dstack(( np.zeros_like(img), img, img)) * 0
+    #new_img = cv2.imread('test_images/test3.jpg')
+    img[region] = [0,255,0]
 
-    # Find the chessboard corners
-    ret, corners = cv2.findChessboardCorners(gray, (nCol,nRow), None)
+    plt.imshow(img)
+    plt.show()
+    return img
 
-    # If found, add object points, image points
-    if ret == True:
-        objpoints.append(objp)
-        imgpoints.append(corners)
+def changePerspectiveBack(img,original):
 
-        # Draw and display the corners
-        #cv2.drawChessboardCorners(img, (nCol,nRow), corners, ret)
-        #cv2.imshow('img', img)
-        #cv2.waitKey(500)
+    img_size = (img.shape[1],img.shape[0])  #x,y
+    # define vertices of the perspective polygon (hard coded based on the picture available for evaluation
+    top_left = [581,458]
+    top_right = [703,458]
+    bottom_left = [241,676]
+    bottom_right = [1053,676]
 
-cv2.destroyAllWindows()
-# Do camera calibration given object points and image points (mtx -> camera matrix , dist -> distortion coefficients)
-img_size = (img.shape[1], img.shape[0])
-ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
+    ### begin change of perspective ###
+    # original coordinates
+    src = np.float32([top_left,top_right,bottom_right,bottom_left])
+    # destination coordinates
+    dst = np.float32([[bottom_left[0],0],[bottom_right[0],0],bottom_right,bottom_left])
+    # compute transform
+    M = cv2.getPerspectiveTransform(dst,src)
+    # use transform to change perspective to top view
+    normal_view = cv2.warpPerspective(img,M,img_size,flags=cv2.INTER_LINEAR)
+    normal_view = cv2.bitwise_or(normal_view,original)
 
-print("Calibration done!\n")
+    #plt.title('Normal view')
+    #plt.imshow(normal_view)
+    #plt.show()
+
+    return normal_view
+
+def addText2Img(img,radius):
+    # font 
+    font = cv2.FONT_HERSHEY_SIMPLEX 
+    # org 
+    org = (50, 50) 
+    # fontScale 
+    fontScale = 1
+    # Blue color in BGR 
+    color = (255, 255, 255) 
+    # Line thickness of 2 px 
+    thickness = 2
+    # Using cv2.putText() method 
+    image = cv2.putText(img,'Curvature radius = '+str(radius)+'m',org, font,fontScale,color,thickness,cv2.LINE_AA) 
+    return image
+
+
+### block comment calibration to run faster
+
+## set grid size internal to the chess board
+#nCol = 9
+#nRow = 6
+## prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+#objp = np.zeros((nRow*nCol,3), np.float32)
+#objp[:,:2] = np.mgrid[0:nCol, 0:nRow].T.reshape(-1,2)
+
+## Arrays to store object points and image points from all the images.
+#objpoints = [] # 3d points in real world space
+#imgpoints = [] # 2d points in image plane.
+
+## Make a list of calibration images
+#images = glob.glob('camera_cal/calibration*.jpg')
+
+#print("Calibrating...\n")
+
+## Step through the list and search for chessboard corners
+#for idx, fname in enumerate(images):
+#    img = cv2.imread(fname)
+#    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+#    # Find the chessboard corners
+#    ret, corners = cv2.findChessboardCorners(gray, (nCol,nRow), None)
+
+#    # If found, add object points, image points
+#    if ret == True:
+#        objpoints.append(objp)
+#        imgpoints.append(corners)
+
+#        # Draw and display the corners
+#        #cv2.drawChessboardCorners(img, (nCol,nRow), corners, ret)
+#        #cv2.imshow('img', img)
+#        #cv2.waitKey(500)
+
+#cv2.destroyAllWindows()
+# # Do camera calibration given object points and image points (mtx -> camera matrix , dist -> distortion coefficients)
+#img_size = (img.shape[1], img.shape[0])
+#ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
+
+#print("Calibration done!\n")
+
+### end block comment
+
+mtx = np.array([[1143.3010,0,657.8923],[0,1139.0312,407.8527],[0,0,1]])
+dist = np.array([-0.2255,-0.2080,-0.001387,0.0006729,0.3713])
 
 ###  Test calibration ###
 # Test undistortion on an image
@@ -301,7 +396,7 @@ dst = cv2.undistort(img, mtx, dist, None, mtx)
 
 ### lane detection ###
 image = cv2.imread('test_images/straight_lines1.jpg')
-image = cv2.imread('test_images/straight_lines2.jpg')
+#image = cv2.imread('test_images/straight_lines2.jpg')
 #image = cv2.imread('test_images/test1.jpg')
 #image = cv2.imread('test_images/test2.jpg')
 #image = cv2.imread('test_images/test3.jpg')
@@ -309,9 +404,14 @@ image = cv2.imread('test_images/straight_lines2.jpg')
 #image = cv2.imread('test_images/test5.jpg') # bad
 #image = cv2.imread('test_images/test6.jpg')
 undistorted_image = cv2.undistort(image, mtx, dist, None, mtx)
-birdsEye = changePerspective(undistorted_image) # apply region of interest mask and change perspective
+birdsEye = changePerspective(undistorted_image) # change perspective
 binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
 left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
 drawLines(left_line_params,right_line_params,img_lines)
-computeCurvate()
+radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
+highligthed_img = highlightLane(left_line_params,right_line_params,birdsEye)
+highlighted_img = changePerspectiveBack(highligthed_img,image)
+final_image = addText2Img(highlighted_img,radius)
 
+plt.imshow(cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB))
+plt.show()
