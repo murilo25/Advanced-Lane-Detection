@@ -61,7 +61,7 @@ def colorFilter(img,thresh):
 def detectLane(img):
     thresh_sobel = [20,200]
     sobel_kernel_size = 3
-    thresh_color = [150,255]
+    thresh_color = [100,255]    ##150,255
     sobel_binary = absoluteSobelFilter(img,'x',thresh_sobel,sobel_kernel_size)
     color_binary = colorFilter(img,thresh_color)
 
