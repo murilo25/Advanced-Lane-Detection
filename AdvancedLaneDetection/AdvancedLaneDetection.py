@@ -240,8 +240,8 @@ def drawLines(left_fit,right_fit,img_out):
 
 def computeCurvateRadius(left_poly,right_poly,img_out):
 
-    print(left_poly)
-    print(right_poly)
+    #print(left_poly)
+    #print(right_poly)
     # Define conversions in x and y from pixels space to meters
     ym_per_pix = 30/676 # meters per pixel in y dimension (estimated length by looking at image/delta Y defined by the region of interest vertices)
     xm_per_pix = 3.7/812 # meters per pixel in x dimension (lane width in meters / delta X in pixels defined by the region of interest
@@ -266,8 +266,8 @@ def computeCurvateRadius(left_poly,right_poly,img_out):
     r_left = ( ( 1+(2*A_left*y+B_left)**2 )**(3/2) ) / ( abs(2*A_left) ) 
     r_right = ( ( 1+(2*A_right*y+B_right)**2 )**(3/2) ) / ( abs(2*A_right) ) 
     
-    print(r_left)
-    print(r_right)
+    #print(r_left)
+    #print(r_right)
     return (r_left+r_right)/2
 
 def highlightLane(left_line_params,right_line_params,img):
@@ -313,11 +313,11 @@ def changePerspectiveBack(img,original):
 
     return normal_view
 
-def addText2Img(img,radius):
+def addText2Img(img,radius,org,txt):
     # font 
     font = cv2.FONT_HERSHEY_SIMPLEX 
     # org 
-    org = (50, 50) 
+    #org = (50, 50) 
     # fontScale 
     fontScale = 1
     # Blue color in BGR 
@@ -325,8 +325,22 @@ def addText2Img(img,radius):
     # Line thickness of 2 px 
     thickness = 2
     # Using cv2.putText() method 
-    image = cv2.putText(img,'Curvature radius = '+str(radius)+'m',org, font,fontScale,color,thickness,cv2.LINE_AA) 
+    image = cv2.putText(img,txt,org, font,fontScale,color,thickness,cv2.LINE_AA) 
     return image
+
+def computeLaneOffset(left_line,right_line,img):
+
+    xm_per_pix = 3.7/812 # meters per pixel in x dimension (lane width in meters / delta X in pixels defined by the region of interest
+
+    y = img.shape[0]
+    x_left = left_line[0]*y**2 + left_line[1]*y + left_line[2]
+    x_right = right_line[0]*y**2 + right_line[1]*y + right_line[2]
+
+
+    offset_pix = abs( ((img.shape[1])/2) - ((x_right-x_left)/2) ) 
+    offset = xm_per_pix * offset_pix
+
+    return offset
 
 
 ### block comment calibration to run faster
@@ -405,6 +419,7 @@ image = cv2.imread('test_images/straight_lines1.jpg')
 #image = cv2.imread('test_images/test5.jpg') # bad
 #image = cv2.imread('test_images/test6.jpg')
 
+
 # load video
 cap = cv2.VideoCapture('project_video.mp4')
 fps = cap.get(5)
@@ -414,18 +429,41 @@ frame_height = cap.get(4)
 fourcc = cv2.VideoWriter_fourcc('X', 'V', 'I', 'D')
 out = cv2.VideoWriter('myVideo.avi',fourcc, fps, (int(frame_width),int(frame_height)))
 
+IIR_alpha_radius = 0.95
+IIR_alpha_poly = 0.9
+frameCounter = 0
 while(cap.isOpened()):
     ret, frame = cap.read()
     if ret==True:
+        frameCounter += 1
+        print('Frame #'+str(frameCounter))  #1253
         undistorted_image = cv2.undistort(frame, mtx, dist, None, mtx)
         birdsEye = changePerspective(undistorted_image) # change perspective
         binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
         left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
         drawLines(left_line_params,right_line_params,img_lines)
         radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
-        highligthed_img = highlightLane(left_line_params,right_line_params,birdsEye)
+
+        if (frameCounter == 1):
+            IIR_radius = radius
+            IIR_left_line_params = left_line_params
+            IIR_right_line_params = right_line_params
+        else:
+            IIR_radius = IIR_radius*IIR_alpha_radius + radius*(1 - IIR_alpha_radius)
+            IIR_left_line_params = IIR_left_line_params*IIR_alpha_poly + left_line_params*(1 - IIR_alpha_poly)
+            IIR_right_line_params = IIR_right_line_params*IIR_alpha_poly + right_line_params*(1 - IIR_alpha_poly)
+
+        lane_offset = computeLaneOffset(IIR_left_line_params,IIR_right_line_params,birdsEye)
+
+        if (frameCounter == 1):
+            IIR_lane_offset = lane_offset
+        else:
+            IIR_lane_offset = IIR_lane_offset*IIR_alpha_radius + lane_offset*(1 - IIR_alpha_radius)
+
+        highligthed_img = highlightLane(IIR_left_line_params,IIR_right_line_params,birdsEye)
         highlighted_img = changePerspectiveBack(highligthed_img,frame)
-        final_image = addText2Img(highlighted_img,radius)
+        final_image = addText2Img(highlighted_img,IIR_radius,(50,50),'Curvature radius = '+str(radius)+'m')
+        final_image = addText2Img(final_image,IIR_lane_offset,(50,100),'Center lane offset = '+str(IIR_lane_offset)+'m')
 
         final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
         #plt.imshow(final_image)
