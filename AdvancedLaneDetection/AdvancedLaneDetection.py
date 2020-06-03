@@ -306,6 +306,7 @@ def changePerspectiveBack(img,original):
     # use transform to change perspective to top view
     normal_view = cv2.warpPerspective(img,M,img_size,flags=cv2.INTER_LINEAR)
     normal_view = cv2.bitwise_or(normal_view,original)
+    #normal_view= cv2.addWeighted(normal_view, 0.3, original, 1, 0)
 
     #plt.title('Normal view')
     #plt.imshow(normal_view)
@@ -342,6 +343,52 @@ def computeLaneOffset(left_line,right_line,img):
 
     return offset
 
+def computeLinesFaster(img,left_fit,right_fit):
+    margin = 100
+    ploty = np.linspace(0, img.shape[0]-1, img.shape[0] )
+    # Grab detected pixels coordinates
+    nonzero = img.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    # Set the area of search based on activated x-values within the +/- margin of our poly
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                    left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                    left_fit[1]*nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                    right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                    right_fit[1]*nonzeroy + right_fit[2] + margin)))
+    
+    # Again, extract left and right line pixel positions
+    left_x = nonzerox[left_lane_inds]
+    left_y = nonzeroy[left_lane_inds] 
+    right_x = nonzerox[right_lane_inds]
+    right_y = nonzeroy[right_lane_inds]
+
+    left_fit_new,right_fit_new = fitPolynomialLines(left_x,left_y,right_x,right_y,img)
+
+    if ( (abs((left_fit_new-left_fit)/left_fit).any() > 0.1) | ( abs((right_fit_new-right_fit)/right_fit).any() > 0.1) ):
+        bad_fit = True
+        print(bad_fit)
+    else:
+        bad_fit = False
+        left_fit = left_fit_new
+        right_fit = right_fit_new
+    ## Visualization ##
+    img_out = np.dstack((img, img, img))*255
+    # Colors pixels detected within windows
+    img_out[left_y, left_x] = [255, 0, 0]
+    img_out[right_y, right_x] = [0, 0, 255]
+    #plt.imshow(img_out)
+    #plt.show()
+
+    left_line = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_line = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    # Plot the polynomial lines onto the image
+    #plt.plot(left_line, ploty, color='yellow')
+    #plt.plot(right_line, ploty, color='yellow')
+    ## End visualization steps ##
+
+    return left_fit,right_fit,img_out,bad_fit
 
 ### block comment calibration to run faster
 
@@ -432,6 +479,7 @@ out = cv2.VideoWriter('myVideo.avi',fourcc, fps, (int(frame_width),int(frame_hei
 IIR_alpha_radius = 0.95
 IIR_alpha_poly = 0.9
 frameCounter = 0
+bad_line = False
 while(cap.isOpened()):
     ret, frame = cap.read()
     if ret==True:
@@ -440,10 +488,16 @@ while(cap.isOpened()):
         undistorted_image = cv2.undistort(frame, mtx, dist, None, mtx)
         birdsEye = changePerspective(undistorted_image) # change perspective
         binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
-        left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
+        # find lane lines based on the quality of the current line
+        # if 2 subsequent lines differs by 10% or more, current line is considered bad
+        # if current line is bad, then line is discarded
+        if ( (frameCounter == 1) | (bad_line == True) ):
+            left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
+        else:
+            left_line_params,right_line_params,img_lines,bad_line = computeLinesFaster(binary_birdsEye,IIR_left_line_params,IIR_right_line_params)
+        # draws line based on the polyfit
         drawLines(left_line_params,right_line_params,img_lines)
         radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
-
         if (frameCounter == 1):
             IIR_radius = radius
             IIR_left_line_params = left_line_params
