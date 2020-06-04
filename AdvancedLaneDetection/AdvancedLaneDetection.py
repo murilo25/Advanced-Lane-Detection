@@ -471,6 +471,8 @@ image = cv2.imread('test_images/straight_lines1.jpg')
 
 # load video
 cap = cv2.VideoCapture('project_video.mp4')
+#cap = cv2.VideoCapture('challenge_video.mp4')
+#cap = cv2.VideoCapture('harder_challenge_video.mp4')
 fps = cap.get(5)
 frame_width = cap.get(3)
 frame_height = cap.get(4)
@@ -482,16 +484,18 @@ IIR_alpha_radius = 0.95
 IIR_alpha_poly = 0.9
 frameCounter = 0
 bad_line = False
+# process video
 while(cap.isOpened()):
     ret, frame = cap.read()
     if ret==True:
         frameCounter += 1
         print('Frame #'+str(frameCounter))  #1253
         undistorted_image = cv2.undistort(frame, mtx, dist, None, mtx)
-        birdsEye = changePerspective(undistorted_image) # change perspective
-        binary_birdsEye = detectLane(birdsEye) # detect all edges using sobel x absolute & color
+        birdsEye = changePerspective(undistorted_image) # change perspective to top view
+        binary_birdsEye = detectLane(birdsEye) # detect edges using sobel x absolute & color
         # find lane lines based on the quality of the current line
         # if 2 subsequent lines differs by 10% or more, current line is considered bad
+        # sanity check can be improved by adding threshold for distance between lines, minimum curvature radius
         # if current line is bad, then line is discarded
         if ( (frameCounter == 1) | (bad_line == True) ):
             left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
@@ -499,6 +503,7 @@ while(cap.isOpened()):
             left_line_params,right_line_params,img_lines,bad_line = computeLinesFaster(binary_birdsEye,IIR_left_line_params,IIR_right_line_params)
         # draws line based on the polyfit
         drawLines(left_line_params,right_line_params,img_lines)
+        # double check calculation
         radius = computeCurvateRadius(left_line_params,right_line_params,img_lines)
         if (frameCounter == 1):
             IIR_radius = radius
@@ -509,6 +514,7 @@ while(cap.isOpened()):
             IIR_left_line_params = IIR_left_line_params*IIR_alpha_poly + left_line_params*(1 - IIR_alpha_poly)
             IIR_right_line_params = IIR_right_line_params*IIR_alpha_poly + right_line_params*(1 - IIR_alpha_poly)
 
+        # Fix calculation
         lane_offset = computeLaneOffset(IIR_left_line_params,IIR_right_line_params,birdsEye)
 
         if (frameCounter == 1):
@@ -521,7 +527,6 @@ while(cap.isOpened()):
         final_image = addText2Img(highlighted_img,IIR_radius,(50,50),'Curvature radius = '+str(radius)+'m')
         final_image = addText2Img(final_image,IIR_lane_offset,(50,100),'Center lane offset = '+str(IIR_lane_offset)+'m')
 
-        final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
         #plt.imshow(final_image)
         #plt.show()
         out.write(final_image)
