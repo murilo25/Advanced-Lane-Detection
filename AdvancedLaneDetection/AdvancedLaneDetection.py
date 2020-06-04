@@ -279,10 +279,12 @@ def highlightLane(left_line_params,right_line_params,img):
  
     region = ( (XX > left_line) & (XX <right_line) )
 
+    #new_img = np.zeros_like(img)
+    #new_img[region] = 255
     #new_img = np.dstack(( np.zeros_like(img), img, img)) * 0
     #new_img = cv2.imread('test_images/test3.jpg')
     img[region] = [0,255,0]
-
+    img[~region] = [0,0,0]
     #plt.imshow(img)
     #plt.show()
     return img
@@ -305,8 +307,8 @@ def changePerspectiveBack(img,original):
     M = cv2.getPerspectiveTransform(dst,src)
     # use transform to change perspective to top view
     normal_view = cv2.warpPerspective(img,M,img_size,flags=cv2.INTER_LINEAR)
-    normal_view = cv2.bitwise_or(normal_view,original)
-    #normal_view= cv2.addWeighted(normal_view, 0.3, original, 1, 0)
+    #normal_view = cv2.bitwise_or(normal_view,original)
+    normal_view= cv2.addWeighted(normal_view, 0.3, original, 1, 0)
 
     #plt.title('Normal view')
     #plt.imshow(normal_view)
