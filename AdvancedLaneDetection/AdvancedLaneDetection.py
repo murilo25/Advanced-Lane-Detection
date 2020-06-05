@@ -83,24 +83,36 @@ def detectLane(img):
 def changePerspective(img):
 
     img_size = (img.shape[1],img.shape[0])  #x,y
-    # define vertices of the perspective polygon (hard coded based on the picture available for evaluation
-    top_left = [581,458]
-    top_right = [703,458]
-    bottom_left = [241,676]
-    bottom_right = [1053,676]
-
     ### begin change of perspective ###
     # original coordinates
-    src = np.float32([top_left,top_right,bottom_right,bottom_left])
+    src = np.float32([[img_size[0], img_size[1]-10],    # bottom right
+                      [0, img_size[1]-10],              # bottom left
+                      [546, 460],                       # top left
+                      [732, 460]])                      # top right
     # destination coordinates
-    dst = np.float32([[bottom_left[0],0],[bottom_right[0],0],bottom_right,bottom_left])
+    dst = np.float32([[img_size[0], img_size[1]],       # bottom right
+                      [0, img_size[1]],                 # bottom left
+                      [0, 0],                           # top left
+                      [img_size[0], 0]])                # top right
     # compute transform
     M = cv2.getPerspectiveTransform(src,dst)
     # use transform to change perspective to top view
     birdsEye = cv2.warpPerspective(img,M,img_size,flags=cv2.INTER_LINEAR)
+    birdsEye = cv2.cvtColor(birdsEye, cv2.COLOR_BGR2RGB)
 
-    #plt.title('Birds eye')
-    #plt.imshow(birdsEye,cmap='gray')
+    #f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
+    #ax1.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    #ax1.plot(src[0][0],src[0][1],'o',color = 'red')
+    #ax1.plot(src[1][0],src[1][1],'o',color = 'red')
+    #ax1.plot(src[2][0],src[2][1],'o',color = 'green')
+    #ax1.plot(src[3][0],src[3][1],'o',color = 'green')
+    #ax1.set_title('Original view', fontsize=30)
+    #ax2.imshow(birdsEye)
+    #ax2.plot(dst[0][0],dst[0][1],'o',color = 'red')
+    #ax2.plot(dst[1][0],dst[1][1],'o',color = 'red')
+    #ax2.plot(dst[2][0],dst[2][1],'o',color = 'green')
+    #ax2.plot(dst[3][0],dst[3][1],'o',color = 'green')
+    #ax2.set_title('Birds eye view', fontsize=30)
     #plt.show()
 
     return birdsEye
@@ -208,6 +220,16 @@ def findPixels(img):
 
     return left_x,left_y,right_x,right_y,img_out
 
+def checkFit(left_fit_new,right_fit_new,left_fit,right_fit):
+    if ( (abs((left_fit_new-left_fit)/left_fit).any() > 0.1) | ( abs((right_fit_new-right_fit)/right_fit).any() > 0.1) ):
+        bad_fit = True
+        print(bad_fit)
+    else:
+        bad_fit = False
+        left_fit = left_fit_new
+        right_fit = right_fit_new
+    return left_fit,right_fit,bad_fit
+
 def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
     # Fit a second order polynomial to each using `np.polyfit`
     left_fit = np.polyfit(left_y, left_x, 2)
@@ -233,8 +255,10 @@ def drawLines(left_fit,right_fit,img_out):
         right_fitx = 1*ploty**2 + 1*ploty
 
     # Plots the left and right polynomials on the lane lines
+    #plt.imshow(img_out)
     #plt.plot(left_fitx, ploty, color='yellow')
     #plt.plot(right_fitx, ploty, color='yellow')
+    #plt.title('Detected lane lines (birdseye view)')
     #plt.show()
     return left_fitx,right_fitx
 
@@ -292,17 +316,17 @@ def highlightLane(left_line_params,right_line_params,img):
 def changePerspectiveBack(img,original):
 
     img_size = (img.shape[1],img.shape[0])  #x,y
-    # define vertices of the perspective polygon (hard coded based on the picture available for evaluation
-    top_left = [581,458]
-    top_right = [703,458]
-    bottom_left = [241,676]
-    bottom_right = [1053,676]
-
     ### begin change of perspective ###
     # original coordinates
-    src = np.float32([top_left,top_right,bottom_right,bottom_left])
+    src = np.float32([[img_size[0], img_size[1]-10],    # bottom right
+                      [0, img_size[1]-10],              # bottom left
+                      [546, 460],                       # top left
+                      [732, 460]])                      # top right
     # destination coordinates
-    dst = np.float32([[bottom_left[0],0],[bottom_right[0],0],bottom_right,bottom_left])
+    dst = np.float32([[img_size[0], img_size[1]],       # bottom right
+                      [0, img_size[1]],                 # bottom left
+                      [0, 0],                           # top left
+                      [img_size[0], 0]])                # top right
     # compute transform
     M = cv2.getPerspectiveTransform(dst,src)
     # use transform to change perspective to top view
@@ -332,7 +356,7 @@ def addText2Img(img,radius,org,txt):
     return image
 
 def computeLaneOffset(left_line,right_line,img):
-
+    print("faster")
     xm_per_pix = 3.7/812 # meters per pixel in x dimension (lane width in meters / delta X in pixels defined by the region of interest
 
     y = img.shape[0]
@@ -340,7 +364,7 @@ def computeLaneOffset(left_line,right_line,img):
     x_right = right_line[0]*y**2 + right_line[1]*y + right_line[2]
 
 
-    offset_pix = abs( ((img.shape[1])/2) - ((x_right-x_left)/2) ) 
+    offset_pix = abs( ((img.shape[1])/2) - (x_left + ((x_right-x_left)/2) ) ) 
     offset = xm_per_pix * offset_pix
 
     return offset
@@ -368,13 +392,8 @@ def computeLinesFaster(img,left_fit,right_fit):
 
     left_fit_new,right_fit_new = fitPolynomialLines(left_x,left_y,right_x,right_y,img)
 
-    if ( (abs((left_fit_new-left_fit)/left_fit).any() > 0.1) | ( abs((right_fit_new-right_fit)/right_fit).any() > 0.1) ):
-        bad_fit = True
-        print(bad_fit)
-    else:
-        bad_fit = False
-        left_fit = left_fit_new
-        right_fit = right_fit_new
+    left_fit,right_fit,bad_fit = checkFit(left_fit_new,right_fit_new,left_fit,right_fit)
+
     ## Visualization ##
     img_out = np.dstack((img, img, img))*255
     # Colors pixels detected within windows
@@ -394,67 +413,67 @@ def computeLinesFaster(img,left_fit,right_fit):
 
 ### block comment calibration to run faster
 
-## set grid size internal to the chess board
-#nCol = 9
-#nRow = 6
-## prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-#objp = np.zeros((nRow*nCol,3), np.float32)
-#objp[:,:2] = np.mgrid[0:nCol, 0:nRow].T.reshape(-1,2)
+# set grid size internal to the chess board
+nCol = 9
+nRow = 6
+# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+objp = np.zeros((nRow*nCol,3), np.float32)
+objp[:,:2] = np.mgrid[0:nCol, 0:nRow].T.reshape(-1,2)
 
-## Arrays to store object points and image points from all the images.
-#objpoints = [] # 3d points in real world space
-#imgpoints = [] # 2d points in image plane.
+# Arrays to store object points and image points from all the images.
+objpoints = [] # 3d points in real world space
+imgpoints = [] # 2d points in image plane.
 
-## Make a list of calibration images
-#images = glob.glob('camera_cal/calibration*.jpg')
+# Make a list of calibration images
+images = glob.glob('camera_cal/calibration*.jpg')
 
-#print("Calibrating...\n")
+print("Calibrating...\n")
 
-## Step through the list and search for chessboard corners
-#for idx, fname in enumerate(images):
-#    img = cv2.imread(fname)
-#    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# Step through the list and search for chessboard corners
+for idx, fname in enumerate(images):
+    img = cv2.imread(fname)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-#    # Find the chessboard corners
-#    ret, corners = cv2.findChessboardCorners(gray, (nCol,nRow), None)
+    # Find the chessboard corners
+    ret, corners = cv2.findChessboardCorners(gray, (nCol,nRow), None)
 
-#    # If found, add object points, image points
-#    if ret == True:
-#        objpoints.append(objp)
-#        imgpoints.append(corners)
+    # If found, add object points, image points
+    if ret == True:
+        objpoints.append(objp)
+        imgpoints.append(corners)
 
-#        # Draw and display the corners
-#        #cv2.drawChessboardCorners(img, (nCol,nRow), corners, ret)
-#        #cv2.imshow('img', img)
-#        #cv2.waitKey(500)
+        # Draw and display the corners
+        #cv2.drawChessboardCorners(img, (nCol,nRow), corners, ret)
+        #cv2.imshow('img', img)
+        #cv2.waitKey(500)
 
 #cv2.destroyAllWindows()
-# # Do camera calibration given object points and image points (mtx -> camera matrix , dist -> distortion coefficients)
-#img_size = (img.shape[1], img.shape[0])
-#ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
+ # Do camera calibration given object points and image points (mtx -> camera matrix , dist -> distortion coefficients)
+img_size = (img.shape[1], img.shape[0])
+ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_size,None,None)
 
-#print("Calibration done!\n")
+print("Calibration done!\n")
 
 ### end block comment
 
-mtx = np.array([[1143.3010,0,657.8923],[0,1139.0312,407.8527],[0,0,1]])
-dist = np.array([-0.2255,-0.2080,-0.001387,0.0006729,0.3713])
+#mtx = np.array([[1143.3010,0,657.8923],[0,1139.0312,407.8527],[0,0,1]])
+#dist = np.array([-0.2255,-0.2080,-0.001387,0.0006729,0.3713])
 
 ###  Test calibration ###
 # Test undistortion on an image
-img = cv2.imread('camera_cal/calibration2.jpg')
+img = cv2.imread('camera_cal/calibration1.jpg')
 img_size = (img.shape[1], img.shape[0])
 
 dst = cv2.undistort(img, mtx, dist, None, mtx)
-#cv2.imwrite('camera_cal/calibration2.jpg',dst)
+cv2.imwrite('camera_cal/calibration1_new.jpg',dst)
 
 # Visualize undistortion
-#f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
-#ax1.imshow(img)
-#ax1.set_title('Original Image', fontsize=30)
-#ax2.imshow(dst)
-#ax2.set_title('Undistorted Image', fontsize=30)
-#plt.show()
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
+ax1.imshow(img)
+ax1.set_title('Original Image', fontsize=30)
+ax2.imshow(dst)
+ax2.set_title('Undistorted Image', fontsize=30)
+plt.show()
 
 ### end calibration test ###
 
@@ -487,6 +506,7 @@ bad_line = False
 # process video
 while(cap.isOpened()):
     ret, frame = cap.read()
+    #frame = image
     if ret==True:
         frameCounter += 1
         print('Frame #'+str(frameCounter))  #1253
@@ -527,6 +547,7 @@ while(cap.isOpened()):
         final_image = addText2Img(highlighted_img,IIR_radius,(50,50),'Curvature radius = '+str(radius)+'m')
         final_image = addText2Img(final_image,IIR_lane_offset,(50,100),'Center lane offset = '+str(IIR_lane_offset)+'m')
 
+        final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
         #plt.imshow(final_image)
         #plt.show()
         out.write(final_image)
