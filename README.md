@@ -69,3 +69,5 @@ With the lane lines properly detected, the image is reverted back to the origina
 
 A sample output of the pipeline can be observed below:
 ![](AdvancedLaneDetection/readme_images/final_image.png)
+
+[Here is a link for a sample video output!](https://www.youtube.com/watch?v=HEGLcaYZbgk)
