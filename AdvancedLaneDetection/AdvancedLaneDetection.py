@@ -220,14 +220,33 @@ def findPixels(img):
 
     return left_x,left_y,right_x,right_y,img_out
 
-def checkFit(left_fit_new,right_fit_new,left_fit,right_fit):
-    if ( (abs((left_fit_new-left_fit)/left_fit).any() > 0.1) | ( abs((right_fit_new-right_fit)/right_fit).any() > 0.1) ):
-        bad_fit = True
-        print(bad_fit)
-    else:
+def checkFit(left_fit_new,right_fit_new,left_fit,right_fit,img_out):
+
+    ploty = np.linspace(0, img_out.shape[0]-1, img_out.shape[0] )
+    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    left_fitx_new = left_fit_new[0]*ploty**2 + left_fit_new[1]*ploty + left_fit_new[2]
+    right_fitx_new = right_fit_new[0]*ploty**2 + right_fit_new[1]*ploty + right_fit_new[2]
+
+    left_error = abs(left_fitx - left_fitx_new)/left_fitx
+    right_error = abs(right_fitx - right_fitx_new)/right_fitx
+
+    if ( (abs(np.mean(left_error)) < 0.1) | (abs(np.mean(right_error)) < 0.1) ):
         bad_fit = False
         left_fit = left_fit_new
         right_fit = right_fit_new
+    else:
+        bad_fit = True
+        
+
+#    if ( (abs((left_fit_new-left_fit)/left_fit).any() > 0.1) | ( abs((right_fit_new-right_fit)/right_fit).any() > 0.1) ):
+#        bad_fit = True
+#    else:
+#        bad_fit = False
+#        left_fit = left_fit_new
+#        right_fit = right_fit_new
+
+
     return left_fit,right_fit,bad_fit
 
 def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
@@ -239,8 +258,8 @@ def fitPolynomialLines(left_x,left_y,right_x,right_y,img_out):
 def computeLines(img):
     left_x,left_y,right_x,right_y,img_out = findPixels(img)
     left_fit,right_fit = fitPolynomialLines(left_x,left_y,right_x,right_y,img_out)
-
-    return left_fit,right_fit,img_out
+    bad_line = False
+    return left_fit,right_fit,img_out,bad_line
 
 def drawLines(left_fit,right_fit,img_out):
     # Generate x and y values for plotting
@@ -356,7 +375,6 @@ def addText2Img(img,radius,org,txt):
     return image
 
 def computeLaneOffset(left_line,right_line,img):
-    print("faster")
     xm_per_pix = 3.7/812 # meters per pixel in x dimension (lane width in meters / delta X in pixels defined by the region of interest
 
     y = img.shape[0]
@@ -392,7 +410,7 @@ def computeLinesFaster(img,left_fit,right_fit):
 
     left_fit_new,right_fit_new = fitPolynomialLines(left_x,left_y,right_x,right_y,img)
 
-    left_fit,right_fit,bad_fit = checkFit(left_fit_new,right_fit_new,left_fit,right_fit)
+    left_fit,right_fit,bad_fit = checkFit(left_fit_new,right_fit_new,left_fit,right_fit,img)
 
     ## Visualization ##
     img_out = np.dstack((img, img, img))*255
@@ -500,7 +518,7 @@ fourcc = cv2.VideoWriter_fourcc('X', 'V', 'I', 'D')
 out = cv2.VideoWriter('myVideo.avi',fourcc, fps, (int(frame_width),int(frame_height)))
 
 IIR_alpha_radius = 0.95
-IIR_alpha_poly = 0.9
+IIR_alpha_poly = 0.85
 frameCounter = 0
 bad_line = False
 # process video
@@ -518,9 +536,10 @@ while(cap.isOpened()):
         # sanity check can be improved by adding threshold for distance between lines, minimum curvature radius
         # if current line is bad, then line is discarded
         if ( (frameCounter == 1) | (bad_line == True) ):
-            left_line_params,right_line_params,img_lines = computeLines(binary_birdsEye)
+            left_line_params,right_line_params,img_lines,bad_line = computeLines(binary_birdsEye)
         else:
             left_line_params,right_line_params,img_lines,bad_line = computeLinesFaster(binary_birdsEye,IIR_left_line_params,IIR_right_line_params)
+        #print(bad_line)
         # draws line based on the polyfit
         drawLines(left_line_params,right_line_params,img_lines)
         # double check calculation
@@ -547,7 +566,7 @@ while(cap.isOpened()):
         final_image = addText2Img(highlighted_img,IIR_radius,(50,50),'Curvature radius = '+str(radius)+'m')
         final_image = addText2Img(final_image,IIR_lane_offset,(50,100),'Center lane offset = '+str(IIR_lane_offset)+'m')
 
-        final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
+        #final_image = cv2.cvtColor(final_image, cv2.COLOR_BGR2RGB)
         #plt.imshow(final_image)
         #plt.show()
         out.write(final_image)
