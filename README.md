@@ -59,8 +59,9 @@ Using the second order polynomial fit from the step above, the curvature radius 
 The curvature radius is compute at the vehicle location, therefore in the equation above, y is considered to be 720 in a 1280x720 (W x H) image.
 The function `computeCurvatureRadius` performs this calculation as well as the conversion from pixel to meter units.
 The calculation of the relative position of the vehicle in respect to the lane center is given by the difference between the center of the car and the center of the lane, assuming that the camera is in line with the center of the car and with the center of the image. The function `computeLaneOffset` performs the following calculation:
-`abs( ((img.shape[1])/2) - (x_left + ((x_right-x_left)/2) ) )`,
+`abs( ((img.shape[1])/2) - (x_left + ((x_right-x_left)/2) ) )`
 
 ## Pipeline output:
-With the lane lines properly detected, the image is reverted back to the original perspective and distorted view. Finally, to allow a qualitative analysis of the performance of the pipeline the area between the lines are highlighted. A sample output of the pipeline can be observed below:
+With the lane lines properly detected, the image is reverted back to the original perspective and distorted view. Finally, to allow a qualitative analysis of the performance of the pipeline the area between the lines are highlighted. 
+A sample output of the pipeline can be observed below:
 ![](AdvancedLaneDetection/readme_images/final_image.png)
