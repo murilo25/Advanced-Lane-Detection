@@ -65,9 +65,8 @@ The calculation of the relative position of the vehicle in respect to the lane c
 `abs( ((img.shape[1])/2) - (x_left + ((x_right-x_left)/2) ) )`
 
 ## Pipeline output:
-With the lane lines properly detected, the image is reverted back to the original perspective and distorted view. Finally, to allow a qualitative analysis of the performance of the pipeline the area between the lines are highlighted. 
+With the lane lines properly detected, the image is reverted back to the original perspective and distorted view. Finally, to allow a qualitative analysis of the performance of the pipeline the area between the lines are highlighted. [Here is a link for a sample video output!](https://www.youtube.com/watch?v=HEGLcaYZbgk)
 
 A sample output of the pipeline can be observed below:
 ![](AdvancedLaneDetection/readme_images/final_image.png)
 
-[Here is a link for a sample video output!](https://www.youtube.com/watch?v=HEGLcaYZbgk)
