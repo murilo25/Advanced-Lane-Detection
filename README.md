@@ -63,5 +63,6 @@ The calculation of the relative position of the vehicle in respect to the lane c
 
 ## Pipeline output:
 With the lane lines properly detected, the image is reverted back to the original perspective and distorted view. Finally, to allow a qualitative analysis of the performance of the pipeline the area between the lines are highlighted. 
+
 A sample output of the pipeline can be observed below:
 ![](AdvancedLaneDetection/readme_images/final_image.png)
